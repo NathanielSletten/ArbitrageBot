@@ -1,6 +1,5 @@
 #Coded by Nathaniel Sletten
 #1/02/2023
-#This script is an example of an arbitrage trading bot, which aims to take advantage of price differences between different crypto exchanges.
 
 import ccxt
 import time
