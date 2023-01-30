@@ -1,0 +1,127 @@
+#Coded by Nathaniel Sletten
+#1/02/2023
+#This script is an example of an arbitrage trading bot, which aims to take advantage of price differences between different crypto exchanges.
+
+import ccxt
+import time
+
+# Define the exchanges to use
+binance = ccxt.binance({
+    'rateLimit': 2000,
+    'enableRateLimit': True,
+    'verbose': True,
+    'apiKey': 'YOUR_BINANCE_API_KEY',
+    'secret': 'YOUR_BINANCE_SECRET_KEY',
+})
+
+coinbase = ccxt.coinbasepro({
+    'rateLimit': 2000,
+    'enableRateLimit': True,
+    'verbose': True,
+    'apiKey': 'YOUR_COINBASE_API_KEY',
+    'secret': 'YOUR_COINBASE_SECRET_KEY',
+})
+
+# Define the symbols to trade
+symbol1 = 'BTC/USDT'
+symbol2 = 'ETH/USDT'
+
+# Define the amount to trade
+amount1 = 0.01
+amount2 = 0.1
+
+# Define the threshold for making a trade
+threshold1 = 0.01
+threshold2 = 0.01
+
+# Define the profit target
+profit_target = 0.02
+
+# Define a counter to limit the number of retries
+counter = 0
+
+while True:
+    try:
+        # Get the current prices
+        price1 = binance.fetch_ticker(symbol1)
+        price2 = coinbase.fetch_ticker(symbol1)
+        price3 = binance.fetch_ticker(symbol2)
+        price4 = coinbase.fetch_ticker(symbol2)
+
+        # Calculate the price difference
+        diff1 = price1['ask'] - price2['bid']
+        diff2 = price3['ask'] - price4['bid']
+
+        # Check if the price difference is greater than the threshold
+        if diff1 > threshold1:
+            # Place a buy order on coinbase and a sell order on binance
+            order1 = coinbase.create_order(symbol1, 'buy', amount1, price2['bid'])
+            order2 = binance.create_order(symbol1, 'sell', amount1, price1['ask'])
+            print(f"Arbitrage opportunity detected for BTC: buying {symbol1} at {price2['bid']} on {coinbase.name} and selling at {price1['ask']} on {binance.name}")
+            while True:
+                try:
+                    # check the status of the orders
+                    order1_status = coinbase.fetch_order(order1['id'])
+                    order2_status = binance.fetch_order(order2['id'])
+                    if order1_status['status'] == 'closed' and order2_status['status'] == 'closed':
+                        # get the price when the orders closed
+                        order1_price = order1_status['average']
+order2_price = order2_status['average']
+                        # calculate the profit
+                        profit = order2_price - order1_price
+                        if profit >= profit_target:
+                            print(f"Arbitrage completed successfully for BTC: Profit: {profit}")
+                        else:
+                            print(f"Arbitrage completed unsuccessfully for BTC: Profit: {profit}")
+                        break
+                except Exception as e:
+                    print(f'Error: {e}. Retrying...')
+                    counter += 1
+                    if counter >= 5:
+                        print("Too many retries, cancelling the order")
+                        coinbase.cancel_order(order1['id'])
+                        binance.cancel_order(order2['id'])
+                        counter = 0
+                        break
+                    time.sleep(5)
+        if diff2 > threshold2:
+            # Place a buy order on coinbase and a sell order on binance
+            order3 = coinbase.create_order(symbol2, 'buy', amount2, price4['bid'])
+            order4 = binance.create_order(symbol2, 'sell', amount2, price3['ask'])
+            print(f"Arbitrage opportunity detected for ETH: buying {symbol2} at {price4['bid']} on {coinbase.name} and selling at {price3['ask']} on {binance.name}")
+            while True:
+                try:
+                    # check the status of the orders
+                    order3_status = coinbase.fetch_order(order3['id'])
+                    order4_status = binance.fetch_order(order4['id'])
+                    if order3_status['status'] == 'closed' and order4_status['status'] == 'closed':
+                        # get the price when the orders closed
+                        order3_price = order3_status['average']
+                        order4_price = order4_status['average']
+                        # calculate the profit
+                        profit = order4_price - order3_price
+                        if profit >= profit_target:
+                            print(f"Arbitrage completed successfully for ETH: Profit: {profit}")
+                        else:
+                            print(f"Arbitrage completed unsuccessfully for ETH: Profit: {profit}")
+                        break
+                except Exception as e:
+                    print(f'Error: {e}. Retrying...')
+                    counter += 1
+                    if counter >= 5:
+                        print("Too many retries, cancelling the order")
+                        coinbase.cancel_order(order3['id'])
+                        binance.cancel_order(order4['id'])
+                        counter = 0
+                        break
+                    time.sleep(5)
+        else:
+            print(f"No arbitrage opportunity detected for {symbol1} and {symbol2}")
+    except Exception as e:
+        print(f'Error: {e}. Retrying...')
+        counter += 1
+        if counter >= 5:
+            print("Too many retries, cancelling the order")
+            counter = 0
+            break
+        time.sleep(5)
